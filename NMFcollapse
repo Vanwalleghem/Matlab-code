@@ -1,0 +1,173 @@
+
+x = inputdlg('Enter Number of repeats', 'Number of repeats');
+NbRepeats = str2num(x{:});
+
+listOfNMFmat = dir('NMF-*.mat');
+numberOfNMF = numel(listOfNMFmat);
+mydata(numberOfNMF).H=0;
+mydata(numberOfNMF).W=0;
+for j = 1:numberOfNMF
+    try
+    myfilename = sprintf('NMF-%d.mat',j);
+    mydata(j)=load(myfilename);
+    end
+end
+
+
+for j = 1:NbRepeats:numberOfNMF
+    F=[];
+    G=[];
+    %try
+    %{
+    if j==16
+        NbRepeats=4;
+    elseif j==20
+        NbRepeats=3;
+    elseif j==24
+        NbRepeats=5;
+    end
+    %}
+    for k=0:(NbRepeats-1)                
+        F=horzcat(F,mydata(j+k).H);
+        G=vertcat(G,mydata(j+k).W);        
+    end
+    [cr,lgs] = xcorr(F,0,'coeff');
+    test2 = find(cr>0.8);
+    start=0;
+    temp=0;
+    clear temparray;
+    clear H;
+    clear I;
+    for idx = 1:numel(test2)
+        element = test2(idx);
+        x = ceil(element/(NbRepeats*size(mydata(1).H,2)));
+        y = mod(element,NbRepeats*size(mydata(1).H,2));
+        if y == 0
+            y=NbRepeats*size(mydata(1).H,2);
+        end
+        if any(temp == y)
+        else
+            temp(end+1) = y;
+            if start==x
+                if exist('temparray') == 1
+                    temparray=vertcat(temparray,G(y,:,:));
+                else
+                    temparray=G(y,:,:);
+			end
+            else
+                if exist('H') == 1
+                    temparray = mean(temparray,1);
+                    H=vertcat(H,temparray);
+                    temparray=G(x,:,:);
+                else
+    				if exist('temparray') == 1
+                        temparray = mean(temparray,1);
+                        H=temparray;
+                        temparray=G(x,:,:);
+                    else
+                        temparray=G(x,:,:);
+                    end
+                end
+					if exist('I') == 1
+                        I=horzcat(I,F(:,x));
+                    else
+                        I=F(:,x);
+                    end
+            end
+        end
+	start=x;
+    end
+    H=vertcat(H,temparray);
+    Hval{j}=I;
+    Wval{j}=H;
+    %end
+    %{
+    if j==20
+        j=24;
+    end
+    %}
+end
+
+save('NMF-collapse.mat','Hval','Wval')
+
+for i=1:size(Hval,2)
+	if isempty(Hval{i})
+	else
+		for k=1:size(Hval{i},2)
+			f=figure('Visible', 'off');subplot(1,2,1);plot(Hval{i}(:,k));subplot(1,2,2);imagesc(squeeze(Wval{i}(k,:,:)),[0,3]); axis image;axis off;
+			myfilename = sprintf('NMFcollapse-%d-%d.fig',i,k);
+			saveas(f, myfilename,'fig');
+			myfilename = sprintf('NMFcollapse-%d-%d.png',i,k);
+			saveas(f, myfilename,'png');
+            close all;
+		end
+	end
+end
+
+stim=zeros(5,500);
+stim(1,85:100)=1;
+stim(2,130:145)=1;
+stim(3,175:190)=1;
+stim(4,220:235)=1;
+stim(5,305:315)=1;
+stim(5,325:335)=1;
+stim(5,350:360)=1;
+stim(5,370:380)=1;
+stim(5,395:415)=1;
+
+stim2=zeros(5,500);
+stim2(1,285:300)=1;
+stim2(2,330:345)=1;
+stim2(3,375:390)=1;
+stim2(4,420:435)=1;
+stim2(5,55:65)=1;
+stim2(5,75:85)=1;
+stim2(5,100:110)=1;
+stim2(5,120:130)=1;
+stim2(5,145:155)=1;
+
+for i=1:size(Hval,2)
+	if isempty(Hval{i})
+    else
+        %{
+		if (50<=i<51) || (50<=i<51)
+		stim3=stim2;
+		else
+		stim3=stim2;
+		end
+        %}
+        stim3=stim2;
+		RHO=[];
+		ccf=[];
+		pval=[];
+		for k=1:size(Hval{i},2)
+			for j=1:size(stim3,1)
+				[RHO,P]=corrcoef(Hval{i}(:,k),transpose(stim3(j,:)));
+				ccf(j,k)=RHO(1,2);
+				pval(j,k)=P(1,2);
+			end
+		end
+		myfilename = sprintf('NMFcorrelation-%d.fig',i);
+		f=figure('Visible', 'off');imagesc(ccf);axis image;
+		saveas(f, myfilename,'fig');
+		myfilename = sprintf('NMFcorrelation-%d.png',i);
+		saveas(f, myfilename,'png');
+        close all;
+		test2=find(ccf>0.5);
+		for idx = 1:numel(test2)
+			element = test2(idx);
+			y = ceil(element/size(stim3,1));
+			x = mod(element,size(stim3,1));
+            if x==0
+                x=5;
+            end
+			f=figure('Visible', 'off');subplot(1,2,1);plot(Hval{i}(:,y));subplot(1,2,2);imagesc(squeeze(Wval{i}(y,:,:)),[0,3]); axis image;axis off;
+			myfilename = sprintf('NMF-%d_%d_stim-%d.png',i,y,x);
+			saveas(f, myfilename,'png');
+			myfilename = sprintf('NMF-%d_%d_stim-%d.fig',i,y,x);
+			saveas(f, myfilename,'fig');
+            close all;
+		end
+	end
+end
+
